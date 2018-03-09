@@ -16,7 +16,34 @@
  *   can be created, and neither is able to terminate.
  */
 
-pcb_t pcb[ 2 ]; int executing = 0;
+pcb_t pcb[ 3 ]; int executing = 0;
+int numberOfProcesses = 3; int nextProcess = 0;
+
+// void scheduler( ctx_t* ctx ) {
+//   PL011_putc( UART0, ' ', true );
+//   PL011_putc( UART0, 'S', true );
+//   PL011_putc( UART0, 'C', true );
+//   PL011_putc( UART0, 'H', true );
+//
+//   if     ( 0 == executing ) {
+//
+//     memcpy( &pcb[ 0 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_1
+//     pcb[ 0 ].status = STATUS_READY;                // update   P_1 status
+//     memcpy( ctx, &pcb[ 1 ].ctx, sizeof( ctx_t ) ); // restore  P_2
+//     pcb[ 1 ].status = STATUS_EXECUTING;            // update   P_2 status
+//     executing = 1;                                 // update   index => P_2
+//   }
+//   else if( 1 == executing ) {
+//
+//     memcpy( &pcb[ 1 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_2
+//     pcb[ 1 ].status = STATUS_READY;                // update   P_2 status
+//     memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) ); // restore  P_1
+//     pcb[ 0 ].status = STATUS_EXECUTING;            // update   P_1 status
+//     executing = 0;                                 // update   index => P_1
+//   }
+//
+//   return;
+// }
 
 void scheduler( ctx_t* ctx ) {
   PL011_putc( UART0, ' ', true );
@@ -24,22 +51,36 @@ void scheduler( ctx_t* ctx ) {
   PL011_putc( UART0, 'C', true );
   PL011_putc( UART0, 'H', true );
 
-  if     ( 0 == executing ) {
+  // if     ( 0 == executing ) {
+  //
+  //   memcpy( &pcb[ 0 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_1
+  //   pcb[ 0 ].status = STATUS_READY;                // update   P_1 status
+  //   memcpy( ctx, &pcb[ 1 ].ctx, sizeof( ctx_t ) ); // restore  P_2
+  //   pcb[ 1 ].status = STATUS_EXECUTING;            // update   P_2 status
+  //   executing = 1;                                 // update   index => P_2
+  // }
+  // else if( 1 == executing ) {
+  //
+  //   memcpy( &pcb[ 1 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_2
+  //   pcb[ 1 ].status = STATUS_READY;                // update   P_2 status
+  //   memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) ); // restore  P_1
+  //   pcb[ 0 ].status = STATUS_EXECUTING;            // update   P_1 status
+  //   executing = 0;                                 // update   index => P_1
+  // }
+  // else if( 2 == executing )
 
-    memcpy( &pcb[ 0 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_1
-    pcb[ 0 ].status = STATUS_READY;                // update   P_1 status
-    memcpy( ctx, &pcb[ 1 ].ctx, sizeof( ctx_t ) ); // restore  P_2
-    pcb[ 1 ].status = STATUS_EXECUTING;            // update   P_2 status
-    executing = 1;                                 // update   index => P_2
+  if(numberOfProcesses != 1){
+    nextProcess = (executing + 1) % numberOfProcesses;
   }
-  else if( 1 == executing ) {
+  else{
+    nextProcess = executing;
+  }
 
-    memcpy( &pcb[ 1 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_2
-    pcb[ 1 ].status = STATUS_READY;                // update   P_2 status
-    memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) ); // restore  P_1
-    pcb[ 0 ].status = STATUS_EXECUTING;            // update   P_1 status
-    executing = 0;                                 // update   index => P_1
-  }
+  memcpy( &pcb[ executing ].ctx, ctx, sizeof( ctx_t ) );        // preserve P_1
+  pcb[ executing ].status = STATUS_READY;                       // update   P_1 status
+  memcpy( ctx, &pcb[ nextProcess ].ctx, sizeof( ctx_t ) );      // restore  P_2
+  pcb[ nextProcess ].status = STATUS_EXECUTING;                 // update   P_2 status
+  executing = nextProcess;                                      // update   index => P_2
 
   return;
 }
@@ -48,6 +89,9 @@ extern void main_P3();
 extern uint32_t tos_P3;
 extern void main_P4();
 extern uint32_t tos_P4;
+extern void main_P5();
+extern uint32_t tos_P5;
+
 
 void hilevel_handler_rst( ctx_t* ctx              ) {
 
@@ -77,6 +121,12 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P4 );
   pcb[ 1 ].ctx.sp   = ( uint32_t )( &(tos_P4)  );
 
+  memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );
+  pcb[ 2 ].pid      = 2;
+  pcb[ 2 ].status   = STATUS_READY;
+  pcb[ 2 ].ctx.cpsr = 0x50;
+  pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P5 );
+  pcb[ 2 ].ctx.sp   = ( uint32_t )( &(tos_P5)  );
   /* Once the PCBs are initialised, we (arbitrarily) select one to be
    * restored (i.e., executed) when the function then returns.
    */
