@@ -16,8 +16,10 @@
  *   can be created, and neither is able to terminate.
  */
 
-pcb_t pcb[ 3 ]; int executing = 0;
-int numberOfProcesses = 3; int nextProcess = 0;
+pcb_t pcb[ 10 ]; int executing = 0;
+int numberOfProcesses = 1; int nextProcess = 0;
+int currentPID = 1;
+int offset = 0x00001000;
 
 // void scheduler( ctx_t* ctx ) {
 //   PL011_putc( UART0, ' ', true );
@@ -46,10 +48,10 @@ int numberOfProcesses = 3; int nextProcess = 0;
 // }
 
 void scheduler( ctx_t* ctx ) {
-  PL011_putc( UART0, ' ', true );
-  PL011_putc( UART0, 'S', true );
-  PL011_putc( UART0, 'C', true );
-  PL011_putc( UART0, 'H', true );
+  // PL011_putc( UART0, ' ', true );
+  // PL011_putc( UART0, 'S', true );
+  // PL011_putc( UART0, 'C', true );
+  // PL011_putc( UART0, 'H', true );
 
   // if     ( 0 == executing ) {
   //
@@ -68,7 +70,7 @@ void scheduler( ctx_t* ctx ) {
   //   executing = 0;                                 // update   index => P_1
   // }
   // else if( 2 == executing )
-
+  PL011_putc( UART0, '0'+executing, true );
   if(numberOfProcesses != 1){
     nextProcess = (executing + 1) % numberOfProcesses;
   }
@@ -85,13 +87,8 @@ void scheduler( ctx_t* ctx ) {
   return;
 }
 
-extern void main_P3();
-extern uint32_t tos_P3;
-extern void main_P4();
-extern uint32_t tos_P4;
-extern void main_P5();
-extern uint32_t tos_P5;
-
+extern void main_console();
+extern uint32_t tos_console;
 
 void hilevel_handler_rst( ctx_t* ctx              ) {
 
@@ -102,38 +99,27 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
    *   mode, with IRQ interrupts enabled, and
    * - the PC and SP values matche the entry point and top of stack.
    */
-   PL011_putc( UART0, ' ', true );
-   PL011_putc( UART0, 'R', true );
-   PL011_putc( UART0, 'S', true );
-   PL011_putc( UART0, 'T', true );
 
-  memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );
-  pcb[ 0 ].pid      = 1;
-  pcb[ 0 ].status   = STATUS_READY;
-  pcb[ 0 ].ctx.cpsr = 0x50;
-  pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_P3 );
-  pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_P3)  );
+    PL011_putc( UART0, ' ', true );
+    PL011_putc( UART0, 'R', true );
+    PL011_putc( UART0, 'S', true );
+    PL011_putc( UART0, 'T', true );
+    memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );
+    pcb[ 0 ].pid      = 1;
+    pcb[ 0 ].status   = STATUS_READY;
+    pcb[ 0 ].ctx.cpsr = 0x50;
+    pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
+    pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_console)  );
 
-  memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );
-  pcb[ 1 ].pid      = 2;
-  pcb[ 1 ].status   = STATUS_READY;
-  pcb[ 1 ].ctx.cpsr = 0x50;
-  pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P4 );
-  pcb[ 1 ].ctx.sp   = ( uint32_t )( &(tos_P4)  );
 
-  memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );
-  pcb[ 2 ].pid      = 2;
-  pcb[ 2 ].status   = STATUS_READY;
-  pcb[ 2 ].ctx.cpsr = 0x50;
-  pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P5 );
-  pcb[ 2 ].ctx.sp   = ( uint32_t )( &(tos_P5)  );
   /* Once the PCBs are initialised, we (arbitrarily) select one to be
    * restored (i.e., executed) when the function then returns.
    */
 
-  memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) );
-  pcb[ 0 ].status = STATUS_EXECUTING;
-  executing = 0;
+   memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) );
+
+    pcb[ 0 ].status = STATUS_EXECUTING;
+    executing = 0;
 
     TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
     TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
@@ -148,7 +134,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
 
     int_enable_irq();
 
-  return;
+    return;
 }
 
 void hilevel_handler_irq(ctx_t* ctx) {
@@ -184,10 +170,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    * - perform whatever is appropriate for this system call,
    * - write any return value back to preserved usr mode registers.
    */
-  // PL011_putc( UART0, ' ', true );
-  // PL011_putc( UART0, 'S', true );
-  // PL011_putc( UART0, 'V', true );
-  // PL011_putc( UART0, 'C', true );
+
   switch( id ) {
     case 0x00 : { // 0x00 => yield()
       // scheduler( ctx );
@@ -207,6 +190,30 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       ctx->gpr[ 0 ] = n;
       // PL011_putc( UART0, 'B', true );
       break;
+    }
+
+    case 0x03: { // 0x03 => fork()
+      numberOfProcesses++;
+      currentPID++;
+
+      memset(&pcb[numberOfProcesses - 1], 0, sizeof(pcb_t));
+      pcb[ numberOfProcesses-1 ].pid      = currentPID;
+      pcb[ numberOfProcesses-1 ].status   = STATUS_READY;
+      pcb[ numberOfProcesses-1 ].ctx.cpsr = 0x50;
+      pcb[ numberOfProcesses-1 ].ctx.pc   = ctx->pc;
+      pcb[ numberOfProcesses-1 ].ctx.sp   = ctx->sp;
+
+      pcb[ numberOfProcesses-1 ].ctx.gpr[ 0 ] = 0;
+      ctx->gpr[0]                             = currentPID;
+
+    }
+
+    case 0x05: { //0x05 => exec()
+
+    }
+
+    case 0x04: { //0x04 => exit()
+
     }
 
     default   : { // 0x?? => unknown/unsupported
