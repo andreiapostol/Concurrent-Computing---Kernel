@@ -48,8 +48,10 @@ int offset = 0x00001000;
 // }
 
 void scheduler( ctx_t* ctx ) {
-
+  PL011_putc( UART0, '`', true );
   PL011_putc( UART0, '0'+executing, true );
+  PL011_putc( UART0, '`', true );
+  PL011_putc( UART0, ' ', true );
   if(numberOfProcesses != 1){
     nextProcess = (executing + 1) % numberOfProcesses;
   }
@@ -101,6 +103,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     pcb[ 0 ].status = STATUS_EXECUTING;
     executing = 0;
 
+    // TIMER0->Timer1Load  = 0x00011010; // select period = 2^20 ticks ~= 1 sec
     TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
     TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
     TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
@@ -121,10 +124,10 @@ void hilevel_handler_irq(ctx_t* ctx) {
   // Step 2: read  the interrupt identifier so we know the source.
 
   uint32_t id = GICC0->IAR;
-  PL011_putc( UART0, ' ', true );
-  PL011_putc( UART0, 'I', true );
-  PL011_putc( UART0, 'R', true );
-  PL011_putc( UART0, 'Q', true );
+  // PL011_putc( UART0, ' ', true );
+  // PL011_putc( UART0, 'I', true );
+  // PL011_putc( UART0, 'R', true );
+  // PL011_putc( UART0, 'Q', true );
 // Step 4: handle the interrupt, then clear (or reset) the source.
 
   if( id == GIC_SOURCE_TIMER0 ) {
@@ -200,15 +203,31 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x04: { //0x04 => exit()
-      // have to terminate current executing process
+      // TODO have to terminate current executing process (executing!!!)
+
+      pcb[ executing ].status = STATUS_TERMINATED;
+
+      //NOT WORKING IF EXECUTING == 1
+
+      PL011_putc( UART0, '0' + executing, true );
+      PL011_putc( UART0, '0' + numberOfProcesses, true );
+
+      if(executing != numberOfProcesses-1)
+         memcpy((void*)pcb[ executing ].tos, (void*)pcb[ numberOfProcesses-1 ].tos, offset);
+      // memset((void*)pcb[ numberOfProcesses-1 ].tos, 0, offset);
+      pcb[ executing ] = pcb[ numberOfProcesses-1 ];
+      // pcb[ executing ].status = STATUS_EXECUTING;
+      numberOfProcesses--;
+      executing %= numberOfProcesses;
+
       break;
 
     }
 
-    case 0x06{ //0x06 => kill()
-      //have to terminate process with pid pidToTerminate
-      uint32_t pidToTerminate = gpr[0];
-      uint32_t signal         = gpr[1];
+    case 0x06: { //0x06 => kill()
+      // TODO have to terminate process with pid pidToTerminate
+      uint32_t pidToTerminate = ctx->gpr[0];
+      uint32_t signal         = ctx->gpr[1];
 
       break;
     }
