@@ -221,7 +221,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       executing %= numberOfProcesses;
 
       break;
-
+//
     }
 
     case 0x06: { //0x06 => kill()
