@@ -48,28 +48,7 @@ int offset = 0x00001000;
 // }
 
 void scheduler( ctx_t* ctx ) {
-  // PL011_putc( UART0, ' ', true );
-  // PL011_putc( UART0, 'S', true );
-  // PL011_putc( UART0, 'C', true );
-  // PL011_putc( UART0, 'H', true );
 
-  // if     ( 0 == executing ) {
-  //
-  //   memcpy( &pcb[ 0 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_1
-  //   pcb[ 0 ].status = STATUS_READY;                // update   P_1 status
-  //   memcpy( ctx, &pcb[ 1 ].ctx, sizeof( ctx_t ) ); // restore  P_2
-  //   pcb[ 1 ].status = STATUS_EXECUTING;            // update   P_2 status
-  //   executing = 1;                                 // update   index => P_2
-  // }
-  // else if( 1 == executing ) {
-  //
-  //   memcpy( &pcb[ 1 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_2
-  //   pcb[ 1 ].status = STATUS_READY;                // update   P_2 status
-  //   memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) ); // restore  P_1
-  //   pcb[ 0 ].status = STATUS_EXECUTING;            // update   P_1 status
-  //   executing = 0;                                 // update   index => P_1
-  // }
-  // else if( 2 == executing )
   PL011_putc( UART0, '0'+executing, true );
   if(numberOfProcesses != 1){
     nextProcess = (executing + 1) % numberOfProcesses;
@@ -159,10 +138,6 @@ void hilevel_handler_irq(ctx_t* ctx) {
   return;
 }
 
-// lolevel irq:
-// bic   r1, r1, 0xFF000000
-// ldr   r1, [le, #-4]
-// @ stmfd sp!, { r0-r3, ip, lr }  @ save    caller-save registers
 void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
   /* Based on the identified encoded as an immediate operand in the
    * instruction,
@@ -174,8 +149,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
   switch( id ) {
     case 0x00 : { // 0x00 => yield()
-      // scheduler( ctx );
-      // PL011_putc( UART0, 'A', true );
+
       break;
     }
 
@@ -211,28 +185,35 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       memcpy((void*) pcb[ numberOfProcesses-1 ].tos, (void*) pcb[ executing ].tos , offset);
       ctx->gpr[0]                             = numberOfProcesses;
 
-      PL011_putc( UART0, '!', true );
       break;
 
     }
 
     case 0x05: { //0x05 => exec()]
       pcb[ executing ].status = STATUS_EXECUTING;
-      // memcpy(&ctx->pc, &ctx->gpr[0], sizeof(ctx->pc));
       ctx->pc = (uint32_t) ctx->gpr[0];
 
-      // PL011_putc( UART0, ctx->pc == ctx->gpr[0] ? 'D' : 'N', true );
-      // de dat clear la stack
+      // TODO de dat clear la stack
+
       break;
 
     }
 
     case 0x04: { //0x04 => exit()
+      // have to terminate current executing process
+      break;
 
     }
 
+    case 0x06{ //0x06 => kill()
+      //have to terminate process with pid pidToTerminate
+      uint32_t pidToTerminate = gpr[0];
+      uint32_t signal         = gpr[1];
+
+      break;
+    }
+
     default   : { // 0x?? => unknown/unsupported
-      // PL011_putc( UART0, 'C', true );
       break;
     }
   }
