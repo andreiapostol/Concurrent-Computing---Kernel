@@ -28,9 +28,6 @@ SECTIONS {
   /* allocate stack for svc mode     */
   .       = . + 0x00001000;
   tos_svc = .;
-  /* allocate stack for console      */
-  .       = . + 0x00001000;
-  tos_console = .;
   /* allocate general stack          */
   .       = . + 0x00100000;
   tos_general = .;

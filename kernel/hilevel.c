@@ -88,7 +88,8 @@ void scheduler( ctx_t* ctx ) {
 }
 
 extern void main_console();
-extern uint32_t tos_console;
+// extern uint32_t tos_console;
+extern uint32_t tos_general;
 
 void hilevel_handler_rst( ctx_t* ctx              ) {
 
@@ -109,8 +110,8 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     pcb[ 0 ].status   = STATUS_READY;
     pcb[ 0 ].ctx.cpsr = 0x50;
     pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
-    pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_console)  );
-
+    pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_general)  );
+    pcb[ 0 ].tos   = ( uint32_t )( &(tos_general)  );
 
   /* Once the PCBs are initialised, we (arbitrarily) select one to be
    * restored (i.e., executed) when the function then returns.
@@ -194,21 +195,35 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x03: { // 0x03 => fork()
       numberOfProcesses++;
-      currentPID++;
 
       memset(&pcb[numberOfProcesses - 1], 0, sizeof(pcb_t));
-      pcb[ numberOfProcesses-1 ].pid      = currentPID;
+      pcb[ numberOfProcesses-1 ].pid      = numberOfProcesses;
       pcb[ numberOfProcesses-1 ].status   = STATUS_READY;
-      pcb[ numberOfProcesses-1 ].ctx.cpsr = 0x50;
-      pcb[ numberOfProcesses-1 ].ctx.pc   = ctx->pc;
-      pcb[ numberOfProcesses-1 ].ctx.sp   = ctx->sp;
+
+      memcpy(&(pcb[ numberOfProcesses-1 ].ctx), ctx, sizeof(ctx_t));
 
       pcb[ numberOfProcesses-1 ].ctx.gpr[ 0 ] = 0;
-      ctx->gpr[0]                             = currentPID;
+      uint32_t offset_tos = (uint32_t) pcb[ executing ].tos - (uint32_t) ctx->sp;
+      pcb[ numberOfProcesses-1 ].tos = (uint32_t) pcb[ executing ].tos + (uint32_t) ((numberOfProcesses-1) * offset);
+      pcb[ numberOfProcesses-1 ].ctx.sp       =  pcb[ numberOfProcesses-1 ].tos + offset_tos;
+      // (&tos_general) + (executing * offset) + ctx->sp;
+
+      memcpy((void*) pcb[ numberOfProcesses-1 ].tos, (void*) pcb[ executing ].tos , offset);
+      ctx->gpr[0]                             = numberOfProcesses;
+
+      PL011_putc( UART0, '!', true );
+      break;
 
     }
 
-    case 0x05: { //0x05 => exec()
+    case 0x05: { //0x05 => exec()]
+      pcb[ executing ].status = STATUS_EXECUTING;
+      // memcpy(&ctx->pc, &ctx->gpr[0], sizeof(ctx->pc));
+      ctx->pc = (uint32_t) ctx->gpr[0];
+
+      // PL011_putc( UART0, ctx->pc == ctx->gpr[0] ? 'D' : 'N', true );
+      // de dat clear la stack
+      break;
 
     }
 
