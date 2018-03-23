@@ -48,19 +48,30 @@ int offset = 0x00001000;
 // }
 
 void scheduler( ctx_t* ctx ) {
-  PL011_putc( UART0, '`', true );
-  PL011_putc( UART0, '0'+executing, true );
-  PL011_putc( UART0, '`', true );
-  PL011_putc( UART0, ' ', true );
-  if(numberOfProcesses != 1){
-    nextProcess = (executing + 1) % numberOfProcesses;
-  }
-  else{
-    nextProcess = executing;
-  }
+  // PL011_putc( UART0, '`', true );
+  // PL011_putc( UART0, '0'+executing, true );
+  // PL011_putc( UART0, '`', true );
+  // PL011_putc( UART0, ' ', true );
+    for(int i = 0; i < numberOfProcesses; i++)
+      PL011_putc( UART0, '0' + (pcb[i].status == STATUS_TERMINATED ? 1 : 0), true );
+    PL011_putc( UART0, ' ', true );
+    if(numberOfProcesses != 1){
+      int exExecuting = executing;
+      do{
+        nextProcess = (++exExecuting) % numberOfProcesses;
+        PL011_putc( UART0, 'l', true );
+      }
+      while(pcb[ nextProcess ].status == STATUS_TERMINATED);
+    }
+    else{
+      nextProcess = executing;
+    }
 
   memcpy( &pcb[ executing ].ctx, ctx, sizeof( ctx_t ) );        // preserve P_1
-  pcb[ executing ].status = STATUS_READY;                       // update   P_1 status
+
+  if(pcb[ executing ].status != STATUS_TERMINATED)
+    pcb[ executing ].status = STATUS_READY;                     // update   P_1 status
+
   memcpy( ctx, &pcb[ nextProcess ].ctx, sizeof( ctx_t ) );      // restore  P_2
   pcb[ nextProcess ].status = STATUS_EXECUTING;                 // update   P_2 status
   executing = nextProcess;                                      // update   index => P_2
@@ -171,6 +182,11 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x03: { // 0x03 => fork()
+      PL011_putc( UART0, 'F', true );
+      PL011_putc( UART0, 'O', true );
+      PL011_putc( UART0, 'R', true );
+      PL011_putc( UART0, 'K', true );
+      PL011_putc( UART0, ' ', true );
       numberOfProcesses++;
 
       memset(&pcb[numberOfProcesses - 1], 0, sizeof(pcb_t));
@@ -193,8 +209,15 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x05: { //0x05 => exec()]
-      pcb[ executing ].status = STATUS_EXECUTING;
-      ctx->pc = (uint32_t) ctx->gpr[0];
+      PL011_putc( UART0, 'E', true );
+      PL011_putc( UART0, 'X', true );
+      PL011_putc( UART0, 'E', true );
+      PL011_putc( UART0, 'C', true );
+      PL011_putc( UART0, ' ', true );
+      if(pcb[ executing ].status != STATUS_TERMINATED){
+        pcb[ executing ].status = STATUS_EXECUTING;
+        ctx->pc = (uint32_t) ctx->gpr[0];
+      }
 
       // TODO de dat clear la stack
 
@@ -204,21 +227,30 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x04: { //0x04 => exit()
       // TODO have to terminate current executing process (executing!!!)
+      PL011_putc( UART0, 'E', true );
+      PL011_putc( UART0, 'X', true );
+      PL011_putc( UART0, 'I', true );
+      PL011_putc( UART0, 'T', true );
+      PL011_putc( UART0, ' ', true );
 
       pcb[ executing ].status = STATUS_TERMINATED;
 
-      //NOT WORKING IF EXECUTING == 1
+      // //NOT WORKING IF EXECUTING == 1
+      //
+      // PL011_putc( UART0, '0' + executing, true );
+      // PL011_putc( UART0, '0' + numberOfProcesses, true );
+      //
+      // if(executing != numberOfProcesses-1){
+      //    int previousTos = pcb[ executing ].tos;
+      //    memcpy((void*)pcb[ executing ].tos, (void*)pcb[ numberOfProcesses-1 ].tos, offset);
+      //    pcb[ executing ].tos = previousTos;
+      //  }
+      // // memset((void*)pcb[ numberOfProcesses-1 ].tos, 0, offset);
+      // pcb[ executing ] = pcb[ numberOfProcesses-1 ];
+      // // pcb[ executing ].status = STATUS_EXECUTING;
+      // numberOfProcesses--;
+      // executing %= numberOfProcesses;
 
-      PL011_putc( UART0, '0' + executing, true );
-      PL011_putc( UART0, '0' + numberOfProcesses, true );
-
-      if(executing != numberOfProcesses-1)
-         memcpy((void*)pcb[ executing ].tos, (void*)pcb[ numberOfProcesses-1 ].tos, offset);
-      // memset((void*)pcb[ numberOfProcesses-1 ].tos, 0, offset);
-      pcb[ executing ] = pcb[ numberOfProcesses-1 ];
-      // pcb[ executing ].status = STATUS_EXECUTING;
-      numberOfProcesses--;
-      executing %= numberOfProcesses;
 
       break;
 //
