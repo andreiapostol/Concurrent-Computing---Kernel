@@ -21,31 +21,6 @@ int numberOfProcesses = 1; int nextProcess = 0;
 int currentPID = 1;
 int offset = 0x00001000;
 
-// void scheduler( ctx_t* ctx ) {
-//   PL011_putc( UART0, ' ', true );
-//   PL011_putc( UART0, 'S', true );
-//   PL011_putc( UART0, 'C', true );
-//   PL011_putc( UART0, 'H', true );
-//
-//   if     ( 0 == executing ) {
-//
-//     memcpy( &pcb[ 0 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_1
-//     pcb[ 0 ].status = STATUS_READY;                // update   P_1 status
-//     memcpy( ctx, &pcb[ 1 ].ctx, sizeof( ctx_t ) ); // restore  P_2
-//     pcb[ 1 ].status = STATUS_EXECUTING;            // update   P_2 status
-//     executing = 1;                                 // update   index => P_2
-//   }
-//   else if( 1 == executing ) {
-//
-//     memcpy( &pcb[ 1 ].ctx, ctx, sizeof( ctx_t ) ); // preserve P_2
-//     pcb[ 1 ].status = STATUS_READY;                // update   P_2 status
-//     memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) ); // restore  P_1
-//     pcb[ 0 ].status = STATUS_EXECUTING;            // update   P_1 status
-//     executing = 0;                                 // update   index => P_1
-//   }
-//
-//   return;
-// }
 
 void scheduler( ctx_t* ctx ) {
   // PL011_putc( UART0, '`', true );
@@ -234,23 +209,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       PL011_putc( UART0, ' ', true );
 
       pcb[ executing ].status = STATUS_TERMINATED;
-
-      // //NOT WORKING IF EXECUTING == 1
-      //
-      // PL011_putc( UART0, '0' + executing, true );
-      // PL011_putc( UART0, '0' + numberOfProcesses, true );
-      //
-      // if(executing != numberOfProcesses-1){
-      //    int previousTos = pcb[ executing ].tos;
-      //    memcpy((void*)pcb[ executing ].tos, (void*)pcb[ numberOfProcesses-1 ].tos, offset);
-      //    pcb[ executing ].tos = previousTos;
-      //  }
-      // // memset((void*)pcb[ numberOfProcesses-1 ].tos, 0, offset);
-      // pcb[ executing ] = pcb[ numberOfProcesses-1 ];
-      // // pcb[ executing ].status = STATUS_EXECUTING;
-      // numberOfProcesses--;
-      // executing %= numberOfProcesses;
-
+      scheduler(ctx);
 
       break;
 //
@@ -260,6 +219,12 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       // TODO have to terminate process with pid pidToTerminate
       uint32_t pidToTerminate = ctx->gpr[0];
       uint32_t signal         = ctx->gpr[1];
+      if(pidToTerminate != 1){
+        for(int i = 0; i < numberOfProcesses; i++)
+          if(pcb[ i ].pid == pidToTerminate)
+            pcb[ i ].status = STATUS_TERMINATED;
+      }
+
 
       break;
     }
