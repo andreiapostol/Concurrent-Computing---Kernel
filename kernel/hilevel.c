@@ -18,7 +18,7 @@
 
 pcb_t pcb[ 10 ]; int executing = 0;
 int numberOfProcesses = 1; int nextProcess = 0;
-int currentPID = 1;
+int currentPID = 0;
 int offset = 0x00001000;
 
 
@@ -50,7 +50,9 @@ void scheduler( ctx_t* ctx ) {
   memcpy( ctx, &pcb[ nextProcess ].ctx, sizeof( ctx_t ) );      // restore  P_2
   pcb[ nextProcess ].status = STATUS_EXECUTING;                 // update   P_2 status
   executing = nextProcess;                                      // update   index => P_2
-
+  PL011_putc( UART0, 'E', true );
+  PL011_putc( UART0, '0'+executing, true );
+  PL011_putc( UART0, ' ', true );
   return;
 }
 
@@ -73,12 +75,16 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     PL011_putc( UART0, 'S', true );
     PL011_putc( UART0, 'T', true );
     memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );
-    pcb[ 0 ].pid      = 1;
+    pcb[ 0 ].pid      = 0;
     pcb[ 0 ].status   = STATUS_READY;
     pcb[ 0 ].ctx.cpsr = 0x50;
     pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
     pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_general)  );
     pcb[ 0 ].tos   = ( uint32_t )( &(tos_general)  );
+
+    for(int i = 0; i < 10; i++){
+      pcb[i].status = STATUS_TERMINATED;
+    }
 
   /* Once the PCBs are initialised, we (arbitrarily) select one to be
    * restored (i.e., executed) when the function then returns.
@@ -162,22 +168,43 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       PL011_putc( UART0, 'R', true );
       PL011_putc( UART0, 'K', true );
       PL011_putc( UART0, ' ', true );
-      numberOfProcesses++;
 
-      memset(&pcb[numberOfProcesses - 1], 0, sizeof(pcb_t));
-      pcb[ numberOfProcesses-1 ].pid      = numberOfProcesses;
-      pcb[ numberOfProcesses-1 ].status   = STATUS_READY;
+      int firstFreePosition = numberOfProcesses;
+      for(int i = 0; i < numberOfProcesses; i++)
+        if(pcb[ i ].status == STATUS_TERMINATED){
+          firstFreePosition = i;
+          break;
+        }
 
-      memcpy(&(pcb[ numberOfProcesses-1 ].ctx), ctx, sizeof(ctx_t));
+      if(firstFreePosition == numberOfProcesses) numberOfProcesses++;
+      currentPID++;
 
-      pcb[ numberOfProcesses-1 ].ctx.gpr[ 0 ] = 0;
+      int newTos = (firstFreePosition == numberOfProcesses - 1) ?
+                   (uint32_t) pcb[ executing ].tos + (uint32_t) ((firstFreePosition) * offset) :
+                   pcb[ firstFreePosition ].tos;
+
+      memset(&pcb[firstFreePosition], 0, sizeof(pcb_t));
+      pcb[ firstFreePosition ].pid      = currentPID;
+      pcb[ firstFreePosition ].status   = STATUS_READY;
+
+      memcpy(&(pcb[ firstFreePosition ].ctx), ctx, sizeof(ctx_t));
+
+      pcb[ firstFreePosition ].ctx.gpr[ 0 ] = 0;
       uint32_t offset_tos = (uint32_t) pcb[ executing ].tos - (uint32_t) ctx->sp;
-      pcb[ numberOfProcesses-1 ].tos = (uint32_t) pcb[ executing ].tos + (uint32_t) ((numberOfProcesses-1) * offset);
-      pcb[ numberOfProcesses-1 ].ctx.sp       =  pcb[ numberOfProcesses-1 ].tos + offset_tos;
+
+      // if(firstFreePosition == numberOfProcesses-1)
+        // pcb[ firstFreePosition ].tos = (uint32_t) pcb[ executing ].tos + (uint32_t) ((firstFreePosition) * offset);
+      pcb[ firstFreePosition ].tos          =  newTos;
+      pcb[ firstFreePosition ].ctx.sp       =  pcb[ firstFreePosition ].tos + offset_tos;
       // (&tos_general) + (executing * offset) + ctx->sp;
 
-      memcpy((void*) pcb[ numberOfProcesses-1 ].tos, (void*) pcb[ executing ].tos , offset);
+      memcpy((void*) pcb[ firstFreePosition ].tos, (void*) pcb[ executing ].tos , offset);
       ctx->gpr[0]                             = numberOfProcesses;
+
+      PL011_putc( UART0, pcb[ firstFreePosition ].ctx.pc == 0 ? 'D' : 'N', true );
+
+      // if(firstFreePosition != numberOfProcesses-1)
+      //   scheduler(ctx);
 
       break;
 
@@ -219,7 +246,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       // TODO have to terminate process with pid pidToTerminate
       uint32_t pidToTerminate = ctx->gpr[0];
       uint32_t signal         = ctx->gpr[1];
-      if(pidToTerminate != 1){
+      if(pidToTerminate != 0){
         for(int i = 0; i < numberOfProcesses; i++)
           if(pcb[ i ].pid == pidToTerminate)
             pcb[ i ].status = STATUS_TERMINATED;
