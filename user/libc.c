@@ -1,7 +1,7 @@
 /* Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
  *
- * Use of this source code is restricted per the CC BY-NC-ND license, a copy of 
- * which can be found via http://creativecommons.org (and should be included as 
+ * Use of this source code is restricted per the CC BY-NC-ND license, a copy of
+ * which can be found via http://creativecommons.org (and should be included as
  * LICENSE.txt within the associated archive or repository).
  */
 
@@ -69,7 +69,7 @@ int write( int fd, const void* x, size_t n ) {
                 "mov r2, %4 \n" // assign r2 =  n
                 "svc %1     \n" // make system call SYS_WRITE
                 "mov %0, r0 \n" // assign r  = r0
-              : "=r" (r) 
+              : "=r" (r)
               : "I" (SYS_WRITE), "r" (fd), "r" (x), "r" (n)
               : "r0", "r1", "r2" );
 
@@ -84,8 +84,8 @@ int  read( int fd,       void* x, size_t n ) {
                 "mov r2, %4 \n" // assign r2 =  n
                 "svc %1     \n" // make system call SYS_READ
                 "mov %0, r0 \n" // assign r  = r0
-              : "=r" (r) 
-              : "I" (SYS_READ),  "r" (fd), "r" (x), "r" (n) 
+              : "=r" (r)
+              : "I" (SYS_READ),  "r" (fd), "r" (x), "r" (n)
               : "r0", "r1", "r2" );
 
   return r;
@@ -95,8 +95,8 @@ int  fork() {
   int r;
 
   asm volatile( "svc %1     \n" // make system call SYS_FORK
-                "mov %0, r0 \n" // assign r  = r0 
-              : "=r" (r) 
+                "mov %0, r0 \n" // assign r  = r0
+              : "=r" (r)
               : "I" (SYS_FORK)
               : "r0" );
 
@@ -113,11 +113,12 @@ void exit( int x ) {
   return;
 }
 
-void exec( const void* x ) {
+void exec( const void* x, const void* p ) {
   asm volatile( "mov r0, %1 \n" // assign r0 = x
+                "mov r1, %2 \n"
                 "svc %0     \n" // make system call SYS_EXEC
               :
-              : "I" (SYS_EXEC), "r" (x)
+              : "I" (SYS_EXEC), "r" (x), "r" (p)
               : "r0" );
 
   return;
@@ -130,7 +131,7 @@ int  kill( int pid, int x ) {
                 "mov r1, %3 \n" // assign r1 =    x
                 "svc %1     \n" // make system call SYS_KILL
                 "mov %0, r0 \n" // assign r0 =    r
-              : "=r" (r) 
+              : "=r" (r)
               : "I" (SYS_KILL), "r" (pid), "r" (x)
               : "r0", "r1" );
 
@@ -141,7 +142,7 @@ void nice( int pid, int x ) {
   asm volatile( "mov r0, %1 \n" // assign r0 =  pid
                 "mov r1, %2 \n" // assign r1 =    x
                 "svc %0     \n" // make system call SYS_NICE
-              : 
+              :
               : "I" (SYS_NICE), "r" (pid), "r" (x)
               : "r0", "r1" );
 

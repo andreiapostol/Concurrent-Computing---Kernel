@@ -93,8 +93,17 @@ void main_console() {
     if     ( 0 == strcmp( p, "execute"   ) ) {
       pid_t pid = fork();
 
+
       if( 0 == pid ) {
-        exec( load( strtok( NULL, " " ) ) );
+        p = strtok(NULL, " ");
+        char *process;
+        strcpy(process, p);
+        p = strtok(NULL, " ");
+        char *priority = NULL;
+        if(p != NULL) strcpy(priority, p);
+
+        int priorityInt = (priority != NULL ? atoi(priority) : 100);
+        exec( load (process), &priority );
       }
     }
     else if( 0 == strcmp( p, "terminate" ) ) {

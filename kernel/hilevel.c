@@ -52,7 +52,9 @@ void scheduler( ctx_t* ctx ) {
   executing = nextProcess;                                      // update   index => P_2
   PL011_putc( UART0, 'E', true );
   PL011_putc( UART0, '0'+executing, true );
-  PL011_putc( UART0, ' ', true );
+  PL011_putc( UART0, ':', true );
+  PL011_putc( UART0, pcb[ executing ].ctx.gpr[0], true );
+  // write( STDOUT_FILENO, pcb[ executing ].ctx.gpr[0], 2 );
   return;
 }
 
@@ -219,6 +221,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       if(pcb[ executing ].status != STATUS_TERMINATED){
         pcb[ executing ].status = STATUS_EXECUTING;
         ctx->pc = (uint32_t) ctx->gpr[0];
+        pcb[ executing ].priority = ctx->gpr[1] != NULL ? ctx->gpr[1] : 100;
       }
 
       // TODO de dat clear la stack
@@ -239,7 +242,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       scheduler(ctx);
 
       break;
-//
+
     }
 
     case 0x06: { //0x06 => kill()

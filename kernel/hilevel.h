@@ -13,8 +13,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
 #include <string.h>
+#include <unistd.h>
 
 // Include functionality relating to the   kernel.
 
@@ -44,6 +44,7 @@ typedef struct {
   status_t status;
      ctx_t    ctx;
      uint32_t tos;
+     uint32_t priority;
 } pcb_t;
 
 #endif
