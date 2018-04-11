@@ -12,6 +12,12 @@
  * carriage return character has been read, or a limit is reached).
  */
 
+int isNumber(char *x){
+  for(int i = 0; i < strlen(x); i++)
+    if(x[i] < '0' || x[i] > '9')
+      return 0;
+  return 1;
+}
 void puts( char* x, int n ) {
   for( int i = 0; i < n; i++ ) {
     PL011_putc( UART1, x[ i ], true );
@@ -92,18 +98,17 @@ void main_console() {
 
     if     ( 0 == strcmp( p, "execute"   ) ) {
       pid_t pid = fork();
+      puts("A INTRAT AICI", 13);
 
 
       if( 0 == pid ) {
         p = strtok(NULL, " ");
-        char *process;
-        strcpy(process, p);
+        char *process = strdup(p);
         p = strtok(NULL, " ");
         char *priority = NULL;
-        if(p != NULL) strcpy(priority, p);
-
+        if(isNumber(p)) priority = strdup(p);
         int priorityInt = (priority != NULL ? atoi(priority) : 100);
-        exec( load (process), &priority );
+        exec( load (process), priorityInt );
       }
     }
     else if( 0 == strcmp( p, "terminate" ) ) {

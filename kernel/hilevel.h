@@ -24,6 +24,7 @@
 
 #include "lolevel.h"
 #include "int.h"
+#include "scheduling.h"
 
 typedef int pid_t;
 
@@ -44,7 +45,8 @@ typedef struct {
   status_t status;
      ctx_t    ctx;
      uint32_t tos;
-     uint32_t priority;
+     uint32_t basePriority;
+     uint32_t currentPriority;
 } pcb_t;
 
 #endif

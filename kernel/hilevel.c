@@ -7,6 +7,7 @@
 
 #include "hilevel.h"
 
+
 /* Since we *know* there will be 2 processes, stemming from the 2 user
  * programs, we can
  *
@@ -21,7 +22,6 @@ int numberOfProcesses = 1; int nextProcess = 0;
 int currentPID = 0;
 int offset = 0x00001000;
 
-
 void scheduler( ctx_t* ctx ) {
   // PL011_putc( UART0, '`', true );
   // PL011_putc( UART0, '0'+executing, true );
@@ -30,17 +30,27 @@ void scheduler( ctx_t* ctx ) {
     for(int i = 0; i < numberOfProcesses; i++)
       PL011_putc( UART0, '0' + (pcb[i].status == STATUS_TERMINATED ? 1 : 0), true );
     PL011_putc( UART0, ' ', true );
-    if(numberOfProcesses != 1){
-      int exExecuting = executing;
-      do{
-        nextProcess = (++exExecuting) % numberOfProcesses;
-        PL011_putc( UART0, 'l', true );
-      }
-      while(pcb[ nextProcess ].status == STATUS_TERMINATED);
-    }
-    else{
-      nextProcess = executing;
-    }
+    // if(numberOfProcesses != 1){
+    //   int exExecuting = executing;
+    //   do{
+    //     nextProcess = (++exExecuting) % numberOfProcesses;
+    //     PL011_putc( UART0, 'l', true );
+    //   }
+    //   while(pcb[ nextProcess ].status == STATUS_TERMINATED);
+    // }
+    // else{
+    //   nextProcess = executing;
+    // }
+
+  prioritize(&pcb, numberOfProcesses);
+  nextProcess = getMaximumPriorityIndex(&pcb, numberOfProcesses);
+  PL011_putc( UART0, 'P', true );
+  PL011_putc( UART0, 'R', true );
+  PL011_putc( UART0, ':', true );
+  PL011_putc( UART0, ' ', true );
+  PL011_putc( UART0, '0'+getMaximumPriorityIndex(&pcb, numberOfProcesses), true );
+  PL011_putc( UART0, ' ', true );
+
 
   memcpy( &pcb[ executing ].ctx, ctx, sizeof( ctx_t ) );        // preserve P_1
 
@@ -83,6 +93,8 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
     pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_general)  );
     pcb[ 0 ].tos   = ( uint32_t )( &(tos_general)  );
+    pcb[ 0 ].basePriority = 100;
+    pcb[ 0 ].currentPriority = 0;
 
     for(int i = 0; i < 10; i++){
       pcb[i].status = STATUS_TERMINATED;
@@ -221,7 +233,8 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       if(pcb[ executing ].status != STATUS_TERMINATED){
         pcb[ executing ].status = STATUS_EXECUTING;
         ctx->pc = (uint32_t) ctx->gpr[0];
-        pcb[ executing ].priority = ctx->gpr[1] != NULL ? ctx->gpr[1] : 100;
+        pcb[ executing ].basePriority = (ctx->gpr[1] != NULL) ? ctx->gpr[1] : 100;
+        pcb[ executing ].currentPriority = 0;
       }
 
       // TODO de dat clear la stack

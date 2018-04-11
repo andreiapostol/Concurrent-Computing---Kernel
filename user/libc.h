@@ -67,7 +67,7 @@ extern int  fork();
 // perform exit, i.e., terminate process with status x
 extern void exit(       int   x );
 // perform exec, i.e., start executing program at address x
-extern void exec( const void* x, const void* p );
+extern void exec( const void* x, int p );
 
 // for process identified by pid, send signal of x
 extern int  kill( pid_t pid, int x );
