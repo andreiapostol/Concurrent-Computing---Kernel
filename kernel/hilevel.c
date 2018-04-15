@@ -7,6 +7,82 @@
 
 #include "hilevel.h"
 
+pcb_t pcb[ 10 ]; int executing = 0;
+pipe_t pipes[ 32 ];
+int numberOfProcesses = 1; int nextProcess = 0;
+int currentPipeID = -1;
+int currentPID = 0;
+int offset = 0x00001000;
+
+void customWrite(char *str, int length){
+  for(int i = 0; i < length; i++){
+    PL011_putc(UART0, str[i], true);
+  }
+}
+
+int getMaximumPriorityIndex( const pcb_t* pcb, int size ){
+  int maxIndex = 0;
+  for (int i = 1; i < size; i++){
+     if(pcb[i].currentPriority > pcb[maxIndex].currentPriority
+       && pcb[i].status != STATUS_TERMINATED){
+       maxIndex = i;
+      //  PL011_putc( UART0, 'F', true );
+     }
+  }
+  return maxIndex;
+}
+
+void prioritize( pcb_t* pcb, int size ){
+  if(size == 1) return;
+  int maxIndex = getMaximumPriorityIndex(pcb, size);
+  int maxPriority = pcb[maxIndex].currentPriority;
+  for (int i = 0; i < size; i++){
+    if(i != maxIndex){
+      pcb[i].currentPriority += (pcb[i].basePriority / 10);
+      if(pcb[i].currentPriority >= maxPriority){
+        pcb[maxIndex].currentPriority = 0;
+      }
+    }
+  }
+}
+
+void renderScreen(){
+  customWrite("┏━━━━━━━━━━━━━━━━━━━━┓",22);
+  customWrite("\n", 1);
+  customWrite("┃ NO ┃     STATUS    ┃",22);
+  customWrite("\n", 1);
+  customWrite("┣━━━━━━━━━━━━━━━━━━━━┫",22);
+  customWrite("\n", 1);
+  for(int i = 0; i < numberOfProcesses; i++){
+    customWrite("┃ ", 2);
+    printNumber(i);
+    customWrite("  ┃  ", 6);
+
+    switch(pcb[i].status){
+      case STATUS_TERMINATED:
+        customWrite("TERMINATED ┃", 12);
+        break;
+      case STATUS_READY:
+        customWrite("   READY   ┃", 12);
+        break;
+      case STATUS_EXECUTING:
+        customWrite(" EXECUTING ┃", 12);
+      default:
+        break;
+    }
+    customWrite("\n", 1);
+  }
+}
+
+void clearScreen(){
+  customWrite("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n", 15);
+}
+
+// else if (pcb[i].currentPriority == maxPriority){
+//   pcb[i].currentPriority += pcb[i].basePriority / 10;
+//   pcb[maxIndex].currentPriority = 0;
+// }
+
 
 /* Since we *know* there will be 2 processes, stemming from the 2 user
  * programs, we can
@@ -17,53 +93,59 @@
  *   can be created, and neither is able to terminate.
  */
 
-pcb_t pcb[ 10 ]; int executing = 0;
-int numberOfProcesses = 1; int nextProcess = 0;
-int currentPID = 0;
-int offset = 0x00001000;
+// enum PipeStatus {UNITIALIZED};
 
 void scheduler( ctx_t* ctx ) {
   // PL011_putc( UART0, '`', true );
   // PL011_putc( UART0, '0'+executing, true );
   // PL011_putc( UART0, '`', true );
   // PL011_putc( UART0, ' ', true );
-    for(int i = 0; i < numberOfProcesses; i++)
-      PL011_putc( UART0, '0' + (pcb[i].status == STATUS_TERMINATED ? 1 : 0), true );
-    PL011_putc( UART0, ' ', true );
-    // if(numberOfProcesses != 1){
-    //   int exExecuting = executing;
-    //   do{
-    //     nextProcess = (++exExecuting) % numberOfProcesses;
-    //     PL011_putc( UART0, 'l', true );
-    //   }
-    //   while(pcb[ nextProcess ].status == STATUS_TERMINATED);
-    // }
-    // else{
-    //   nextProcess = executing;
-    // }
+    // PL011_putc( UART0, '[', true );
+    // for(int i = 0; i < numberOfProcesses; i++)
+    //   PL011_putc( UART0, '0' + (pcb[i].status == STATUS_TERMINATED ? 1 : 0), true );
+    // PL011_putc( UART0, ']', true );
+    // PL011_putc( UART0, ' ', true );
+    if(numberOfProcesses != 1){
+      int exExecuting = executing;
+      do{
+        nextProcess = (++exExecuting) % numberOfProcesses;
+      }
+      while(pcb[ nextProcess ].status == STATUS_TERMINATED);
+    }
+    else{
+      nextProcess = executing;
+    }
 
-  prioritize(&pcb, numberOfProcesses);
-  nextProcess = getMaximumPriorityIndex(&pcb, numberOfProcesses);
-  PL011_putc( UART0, 'P', true );
-  PL011_putc( UART0, 'R', true );
-  PL011_putc( UART0, ':', true );
-  PL011_putc( UART0, ' ', true );
-  PL011_putc( UART0, '0'+getMaximumPriorityIndex(&pcb, numberOfProcesses), true );
-  PL011_putc( UART0, ' ', true );
+  // prioritize(pcb, numberOfProcesses);
+  // int a  = getMaximumPriorityIndex(pcb, numberOfProcesses);
+  // nextProcess = getMaximumPriorityIndex(pcb, numberOfProcesses);
+  // if(numberOfProcesses == 2) nextProcess = 1;
+
+  // PL011_putc( UART0, '(', true );
+  // PL011_putc( UART0, 'P', true );
+  // PL011_putc( UART0, 'R', true );
+  // PL011_putc( UART0, ':', true );
+  // PL011_putc( UART0, ' ', true );
+  // PL011_putc( UART0, '0'+getMaximumPriorityIndex(pcb, numberOfProcesses), true );
+  // PL011_putc( UART0, '0'+nextProcess, true );
+  // PL011_putc( UART0, ')', true );
+  // PL011_putc( UART0, ' ', true );
 
 
-  memcpy( &pcb[ executing ].ctx, ctx, sizeof( ctx_t ) );        // preserve P_1
+  if(nextProcess != executing){
+    memcpy( &pcb[ executing ].ctx, ctx, sizeof( ctx_t ) );        // preserve P_1
 
-  if(pcb[ executing ].status != STATUS_TERMINATED)
-    pcb[ executing ].status = STATUS_READY;                     // update   P_1 status
+    if(pcb[ executing ].status != STATUS_TERMINATED)
+      pcb[ executing ].status = STATUS_READY;                     // update   P_1 status
 
-  memcpy( ctx, &pcb[ nextProcess ].ctx, sizeof( ctx_t ) );      // restore  P_2
-  pcb[ nextProcess ].status = STATUS_EXECUTING;                 // update   P_2 status
-  executing = nextProcess;                                      // update   index => P_2
-  PL011_putc( UART0, 'E', true );
-  PL011_putc( UART0, '0'+executing, true );
-  PL011_putc( UART0, ':', true );
-  PL011_putc( UART0, pcb[ executing ].ctx.gpr[0], true );
+    memcpy( ctx, &pcb[ nextProcess ].ctx, sizeof( ctx_t ) );      // restore  P_2
+    pcb[ nextProcess ].status = STATUS_EXECUTING;                 // update   P_2 status
+    executing = nextProcess;                                      // update   index => P_2
+  }
+  // PL011_putc( UART0, 'E', true );
+  // PL011_putc( UART0, '0'+executing, true );
+  // PL011_putc( UART0, ':', true );
+  // PL011_putc( UART0, pcb[ executing ].ctx.gpr[0], true );
   // write( STDOUT_FILENO, pcb[ executing ].ctx.gpr[0], 2 );
   return;
 }
@@ -86,6 +168,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     PL011_putc( UART0, 'R', true );
     PL011_putc( UART0, 'S', true );
     PL011_putc( UART0, 'T', true );
+
     memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );
     pcb[ 0 ].pid      = 0;
     pcb[ 0 ].status   = STATUS_READY;
@@ -123,6 +206,11 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
 
     int_enable_irq();
 
+    for(int i = 0; i < 32; i++){
+      pipes[i].data[0] = -42;
+      pipes[i].data[1] = -42;
+    }
+
     return;
 }
 
@@ -144,6 +232,11 @@ void hilevel_handler_irq(ctx_t* ctx) {
 // Step 5: write the interrupt identifier to signal we're done.
 
   GICC0->EOIR = id;
+  customWrite("\e[1;1H\e[2J", 12);
+  renderScreen();
+  // system("clear");
+
+  // clearScreen();
   return;
 }
 
@@ -177,11 +270,11 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x03: { // 0x03 => fork()
-      PL011_putc( UART0, 'F', true );
-      PL011_putc( UART0, 'O', true );
-      PL011_putc( UART0, 'R', true );
-      PL011_putc( UART0, 'K', true );
-      PL011_putc( UART0, ' ', true );
+      // PL011_putc( UART0, 'F', true );
+      // PL011_putc( UART0, 'O', true );
+      // PL011_putc( UART0, 'R', true );
+      // PL011_putc( UART0, 'K', true );
+      // PL011_putc( UART0, ' ', true );
 
       int firstFreePosition = numberOfProcesses;
       for(int i = 0; i < numberOfProcesses; i++)
@@ -204,6 +297,9 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       memcpy(&(pcb[ firstFreePosition ].ctx), ctx, sizeof(ctx_t));
 
       pcb[ firstFreePosition ].ctx.gpr[ 0 ] = 0;
+      // PL011_putc( UART0, '0' + (pcb[ firstFreePosition ].ctx.gpr[ 0 ] == 0) ? 1 : 0, true );
+      // if (pcb[ firstFreePosition ].ctx.gpr[ 0 ] == 0)
+      //   PL011_putc( UART0, 'Y', true );
       uint32_t offset_tos = (uint32_t) pcb[ executing ].tos - (uint32_t) ctx->sp;
 
       // if(firstFreePosition == numberOfProcesses-1)
@@ -215,7 +311,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       memcpy((void*) pcb[ firstFreePosition ].tos, (void*) pcb[ executing ].tos , offset);
       ctx->gpr[0]                             = numberOfProcesses;
 
-      PL011_putc( UART0, pcb[ firstFreePosition ].ctx.pc == 0 ? 'D' : 'N', true );
+      // PL011_putc( UART0, '0' + firstFreePosition, true );
 
       // if(firstFreePosition != numberOfProcesses-1)
       //   scheduler(ctx);
@@ -225,15 +321,15 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x05: { //0x05 => exec()]
-      PL011_putc( UART0, 'E', true );
-      PL011_putc( UART0, 'X', true );
-      PL011_putc( UART0, 'E', true );
-      PL011_putc( UART0, 'C', true );
-      PL011_putc( UART0, ' ', true );
+      // PL011_putc( UART0, 'E', true );
+      // PL011_putc( UART0, 'X', true );
+      // PL011_putc( UART0, 'E', true );
+      // PL011_putc( UART0, 'C', true );
+      // PL011_putc( UART0, ' ', true );
       if(pcb[ executing ].status != STATUS_TERMINATED){
         pcb[ executing ].status = STATUS_EXECUTING;
         ctx->pc = (uint32_t) ctx->gpr[0];
-        pcb[ executing ].basePriority = (ctx->gpr[1] != NULL) ? ctx->gpr[1] : 100;
+        pcb[ executing ].basePriority = ctx->gpr[1];
         pcb[ executing ].currentPriority = 0;
       }
 
@@ -245,11 +341,11 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x04: { //0x04 => exit()
       // TODO have to terminate current executing process (executing!!!)
-      PL011_putc( UART0, 'E', true );
-      PL011_putc( UART0, 'X', true );
-      PL011_putc( UART0, 'I', true );
-      PL011_putc( UART0, 'T', true );
-      PL011_putc( UART0, ' ', true );
+      // PL011_putc( UART0, 'E', true );
+      // PL011_putc( UART0, 'X', true );
+      // PL011_putc( UART0, 'I', true );
+      // PL011_putc( UART0, 'T', true );
+      // PL011_putc( UART0, ' ', true );
 
       pcb[ executing ].status = STATUS_TERMINATED;
       scheduler(ctx);
@@ -268,6 +364,45 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ i ].status = STATUS_TERMINATED;
       }
 
+
+      break;
+    }
+
+    case 0x10: { //0x10 => pipe()
+      int firstProcess  = ctx->gpr[0];
+      int secondProcess = ctx->gpr[1];
+
+      currentPipeID++;
+
+      pipes[currentPipeID].process1 = firstProcess;
+      pipes[currentPipeID].process2 = secondProcess;
+
+      pipes[currentPipeID].data[0] = -42;
+      pipes[currentPipeID].data[1] = -42 ;
+
+      break;
+    }
+
+    case 0x11: { //0x11 => readPipe()
+      int pipeId  = ctx->gpr[0];
+      int channel = ctx->gpr[1];
+
+      if(pipeId <= currentPipeID)
+        ctx->gpr[0] = pipes[pipeId].data[channel];
+      else ctx->gpr[0] = -42;
+
+      break;
+    }
+
+    case 0x12: { //0x12 => writePipe()
+      // int pipeId = ctx->gpr[0];
+      int pipeId    = ctx->gpr[0];
+      int direction = ctx->gpr[1];
+      int data      = ctx->gpr[2];
+
+      if(pipeId <= currentPipeID){
+        pipes[pipeId].data[direction] = data;
+      }
 
       break;
     }

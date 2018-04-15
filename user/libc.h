@@ -38,9 +38,13 @@ typedef int pid_t;
 #define SYS_EXEC      ( 0x05 )
 #define SYS_KILL      ( 0x06 )
 #define SYS_NICE      ( 0x07 )
-
 #define SIG_TERM      ( 0x00 )
 #define SIG_QUIT      ( 0x01 )
+
+#define SYS_PIPE      ( 0x10 )
+#define SYS_READPIPE  ( 0x11 )
+#define SYS_WRITEPIPE ( 0x12 )
+
 
 #define EXIT_SUCCESS  ( 0 )
 #define EXIT_FAILURE  ( 1 )
@@ -48,6 +52,12 @@ typedef int pid_t;
 #define  STDIN_FILENO ( 0 )
 #define STDOUT_FILENO ( 1 )
 #define STDERR_FILENO ( 2 )
+
+void strrev ( char *p );
+void printNumber( int x );
+void printString( char *s, int length);
+
+
 
 // convert ASCII string x into integer r
 extern int  atoi( char* x        );
@@ -73,5 +83,12 @@ extern void exec( const void* x, int p );
 extern int  kill( pid_t pid, int x );
 // for process identified by pid, set  priority to x
 extern void nice( pid_t pid, int x );
+
+extern void pipe     ( int p1, int p2 );
+extern int  readPipe ( int pipeId, int channel);
+extern void writePipe( int pipeId, int direction, int data);
+
+int properPipeRead(int pipeId, int channel);
+void properPipeWrite(int pipeId, int destination, int data);
 
 #endif

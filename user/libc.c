@@ -7,6 +7,68 @@
 
 #include "libc.h"
 
+
+// void strrev(char *p)
+// {
+//   char *q = p;
+//   while(q && *q) ++q;
+//   for(--q; p < q; ++p, --q){
+//     *p = *p ^ *q,
+//     *q = *p ^ *q,
+//     *p = *p ^ *q;
+//   }
+// }
+void reverse(char *s, int length)
+{
+    int c, i, j;
+
+    for (i = 0, j = length - 1; i < j; i++, j--)
+    {
+        c = s[i];
+        s[i] = s[j];
+        s[j] = c;
+    }
+}
+
+void printNumber(int x){
+  // write(STDOUT_FILENO, "AAAAA", 5);
+  if(x){
+    int i = -1;
+    char *str;
+    while(x){
+      str[++i] = '0' + (x % 10);
+      // write(STDOUT_FILENO, str, 1);
+      x /= 10;
+    }
+    reverse(str, i+1);
+    write(STDOUT_FILENO, str, i+1);
+  }
+  else write(STDOUT_FILENO, "0", 1);
+  // if(x == 0) write(STDOUT_FILENO, "0", 1);
+}
+
+void printString(char *s, int length){
+  write(STDOUT_FILENO, s, length);
+}
+
+int properPipeRead(int pipeId, int channel){
+  int readValue = readPipe(pipeId, channel);
+  while(readValue == -42){
+    readValue = readPipe(pipeId, channel);
+  }
+  writePipe(pipeId, channel, -42);
+  return readValue;
+}
+
+void properPipeWrite(int pipeId, int destination, int data){
+  int readValue = readPipe(pipeId, destination);
+  while(readValue != -42){
+    readValue = readPipe(pipeId, destination);
+  }
+  // printNumber(data);
+  writePipe(pipeId, destination, data);
+}
+
 int  atoi( char* x        ) {
   char* p = x; bool s = false; int r = 0;
 
@@ -148,3 +210,72 @@ void nice( int pid, int x ) {
 
   return;
 }
+
+
+
+void pipe(int p1, int p2){
+
+  asm volatile(   "mov r0, %1 \n"
+                  "mov r1, %2 \n"
+                  "svc %0     \n" // make system call SYS_PIPE
+                :
+                : "I" (SYS_PIPE), "r" (p1), "r" (p2)
+                : "r0", "r1" );
+}
+
+int readPipe(int pipeId, int channel){
+  int r;
+  asm volatile(   "mov r0, %2 \n"
+                  "mov r1, %3 \n"
+                  "svc %1     \n" // make system call SYS_PIPE
+                  "mov %0, r0 \n"
+                : "=r" (r)
+                : "I" (SYS_READPIPE), "r" (pipeId), "r" (channel)
+                : "r0", "r1" );
+
+  return r;
+}
+
+void writePipe(int pipeId, int direction, int data){
+  asm volatile(   "mov r0, %1 \n"
+                  "mov r1, %2 \n"
+                  "mov r2, %3 \n"
+                  "svc %0     \n" // make system call SYS_PIPE
+                :
+                : "I" (SYS_WRITEPIPE), "r" (pipeId), "r" (direction), "r" (data)
+                : "r0", "r1", "r3" );
+}
+
+
+
+
+
+// int pipe( int filedes[2] ){
+//   int r;
+//   asm volatile( "mov r0, %2 \n"
+//                 "svc %1     \n" // make system call SYS_PIPE
+//                 "mov %0, r0 \n"
+//               : "=r" (r)
+//               : "I" (SYS_PIPE), "r" (filedes)
+//               : "r0");
+//   return r;
+// }
+
+
+
+
+
+
+
+
+
+// int pipe( int *filedes ){
+//   int r;
+//   asm volatile( "mov r0, %1 \n" // assign r0 =    write-end
+//                 "mov r1, %2 \n" // assign r1 =    read-end
+//                 "svc %0     \n" // make system call SYS_PIPE
+//               :
+//               : "I" (SYS_PIPE), "r" (filedes[0]), "r" (filedes[1])
+//               : "r0", "r1" );
+//   return r;
+// }

@@ -13,8 +13,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
-#include <unistd.h>
+#include <stdlib.h>
 
 // Include functionality relating to the   kernel.
 
@@ -40,7 +39,7 @@ typedef struct {
   uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
 } ctx_t;
 
-typedef struct {
+typedef struct pcb_t {
      pid_t    pid;
   status_t status;
      ctx_t    ctx;
@@ -48,5 +47,11 @@ typedef struct {
      uint32_t basePriority;
      uint32_t currentPriority;
 } pcb_t;
+
+typedef struct pipe_t{
+  pid_t process1, process2;
+  int data[2];
+} pipe_t;
+
 
 #endif

@@ -43,6 +43,8 @@ void gets( char* x, int n ) {
 extern void main_P3();
 extern void main_P4();
 extern void main_P5();
+extern void main_waiter();
+extern void main_philo();
 
 void* load( char* x ) {
   if     ( 0 == strcmp( x, "P3" ) ) {
@@ -53,6 +55,12 @@ void* load( char* x ) {
   }
   else if( 0 == strcmp( x, "P5" ) ) {
     return &main_P5;
+  }
+  else if( 0 == strcmp( x, "waiter") ) {
+    return &main_waiter;
+  }
+  else if( 0 == strcmp( x, "philo") ){
+    return &main_philo;
   }
 
   return NULL;
@@ -98,8 +106,8 @@ void main_console() {
 
     if     ( 0 == strcmp( p, "execute"   ) ) {
       pid_t pid = fork();
-      puts("A INTRAT AICI", 13);
 
+      // PL011_putc( UART0, 'T', true );
 
       if( 0 == pid ) {
         p = strtok(NULL, " ");
@@ -110,6 +118,11 @@ void main_console() {
         int priorityInt = (priority != NULL ? atoi(priority) : 100);
         exec( load (process), priorityInt );
       }
+      // for(int i = 0; i < 10; i++){
+      //   if(i == pid) PL011_putc( UART0, '0'+i, true );
+      // }
+      char *test;
+      itoa(test, pid);
     }
     else if( 0 == strcmp( p, "terminate" ) ) {
       pid_t pid = atoi( strtok( NULL, " " ) );
