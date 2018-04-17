@@ -7,8 +7,8 @@
 
 #include "hilevel.h"
 
-pcb_t pcb[ 10 ]; int executing = 0;
-pipe_t pipes[ 32 ];
+pcb_t pcb[ 64 ]; int executing = 0;
+pipe_t pipes[ 64 ];
 int numberOfProcesses = 1; int nextProcess = 0;
 int currentPipeID = -1;
 int currentPID = 0;
@@ -20,58 +20,45 @@ void customWrite(char *str, int length){
   }
 }
 
-int getMaximumPriorityIndex( const pcb_t* pcb, int size ){
-  int maxIndex = 0;
-  for (int i = 1; i < size; i++){
-     if(pcb[i].currentPriority > pcb[maxIndex].currentPriority
-       && pcb[i].status != STATUS_TERMINATED){
-       maxIndex = i;
-      //  PL011_putc( UART0, 'F', true );
-     }
-  }
-  return maxIndex;
-}
-
-void prioritize( pcb_t* pcb, int size ){
-  if(size == 1) return;
-  int maxIndex = getMaximumPriorityIndex(pcb, size);
-  int maxPriority = pcb[maxIndex].currentPriority;
-  for (int i = 0; i < size; i++){
-    if(i != maxIndex){
-      pcb[i].currentPriority += (pcb[i].basePriority / 10);
-      if(pcb[i].currentPriority >= maxPriority){
-        pcb[maxIndex].currentPriority = 0;
-      }
-    }
-  }
-}
-
 void renderScreen(){
-  customWrite("┏━━━━━━━━━━━━━━━━━━━━┓",22);
+  customWrite("┏━━━━┳━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┓",120);
   customWrite("\n", 1);
-  customWrite("┃ NO ┃     STATUS    ┃",22);
+  customWrite("┃ NO ┃  PID ┃   STATUS    ┃  PRIORITY  ┃",50);
   customWrite("\n", 1);
-  customWrite("┣━━━━━━━━━━━━━━━━━━━━┫",22);
+  customWrite("┣━━━━╋━━━━━━╋━━━━━━━━━━━━━╋━━━━━━━━━━━━┫",120);
   customWrite("\n", 1);
   for(int i = 0; i < numberOfProcesses; i++){
-    customWrite("┃ ", 2);
+    customWrite("┃ ", 4);
     printNumber(i);
-    customWrite("  ┃  ", 6);
+    if(i < 10) customWrite("  ┃  ", 8);
+    else customWrite(" ┃  ", 7);
+
+    printNumber(pcb[i].pid);
+    if(pcb[i].pid < 10) customWrite("   ┃ ", 8);
+    else customWrite("  ┃ ", 7);
 
     switch(pcb[i].status){
       case STATUS_TERMINATED:
-        customWrite("TERMINATED ┃", 12);
+        customWrite("\x1B[31m TERMINATED\033[0m ┃     ", 30);
         break;
       case STATUS_READY:
-        customWrite("   READY   ┃", 12);
+        customWrite("\x1B[33m   READY\033[0m    ┃     ", 30);
         break;
       case STATUS_EXECUTING:
-        customWrite(" EXECUTING ┃", 12);
+        customWrite("\x1B[32m EXECUTING\033[0m  ┃     ", 30);
       default:
         break;
     }
+
+    printNumber(pcb[i].currentPriority);
+    if(pcb[i].currentPriority < 10) customWrite("      ┃", 10);
+    else if(pcb[i].currentPriority < 100)  customWrite("     ┃", 9);
+    else if(pcb[i].currentPriority < 1000) customWrite("    ┃", 8);
+
     customWrite("\n", 1);
   }
+    customWrite("┗━━━━┻━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━┛",120);
+    customWrite("\n", 1);
 }
 
 void clearScreen(){
@@ -121,15 +108,7 @@ void scheduler( ctx_t* ctx ) {
   // nextProcess = getMaximumPriorityIndex(pcb, numberOfProcesses);
   // if(numberOfProcesses == 2) nextProcess = 1;
 
-  // PL011_putc( UART0, '(', true );
-  // PL011_putc( UART0, 'P', true );
-  // PL011_putc( UART0, 'R', true );
-  // PL011_putc( UART0, ':', true );
-  // PL011_putc( UART0, ' ', true );
-  // PL011_putc( UART0, '0'+getMaximumPriorityIndex(pcb, numberOfProcesses), true );
-  // PL011_putc( UART0, '0'+nextProcess, true );
-  // PL011_putc( UART0, ')', true );
-  // PL011_putc( UART0, ' ', true );
+
 
 
   if(nextProcess != executing){
@@ -193,7 +172,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     executing = 0;
 
     // TIMER0->Timer1Load  = 0x00011010; // select period = 2^20 ticks ~= 1 sec
-    TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
+    TIMER0->Timer1Load  = 0x00010000; // select period = 2^20 ticks ~= 1 sec
     TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
     TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
     TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
@@ -206,9 +185,11 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
 
     int_enable_irq();
 
-    for(int i = 0; i < 32; i++){
-      pipes[i].data[0] = -42;
-      pipes[i].data[1] = -42;
+    for(int i = 0; i < 64; i++){
+      pipes[i].isWritten = 0;
+      pipes[i].isClosed  = 0;
+      pipes[i].isFree    = 1;
+      pipes[i].message   = UNWRITTEN;
     }
 
     return;
@@ -234,9 +215,31 @@ void hilevel_handler_irq(ctx_t* ctx) {
   GICC0->EOIR = id;
   customWrite("\e[1;1H\e[2J", 12);
   renderScreen();
-  // system("clear");
 
-  // clearScreen();
+  // printString("\\   ●  |  ●  |  ●  |  ●    /",28);
+  // printString("\n",1);
+  // printString("● ╔=======================╗ ●",29);
+  // printString("\n",1);
+  // printString("| ║                       ║ |",29);
+  // printString("\n",1);
+  // printString("  ╚=======================╝ ",29);
+  // printString("\n",1);
+  // printString("\\   ●  |  ●  |  ●  |  ●    /",30);
+
+  // printString("\\  o   |  x  |  o  |   o   /\n", 29);
+  // printString("o                           o\n", 30);
+  // printString("|                           |\n", 30);
+  // printString("o                           o\n", 30);
+  // printString("|                           |\n", 30);
+  // printString("o                           o\n", 30);
+  // printString("|                           |\n", 30);
+  // printString("o                           o\n", 30);
+  // printString("/  o   |  o  |  o  |   o   \\\n", 29);
+  // for(int i = 0; i < 8; i++){
+  //   printNumber(pipes[i].message);
+  //   printString(" ", 1);
+  // }
+
   return;
 }
 
@@ -369,40 +372,51 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x10: { //0x10 => pipe()
-      int firstProcess  = ctx->gpr[0];
-      int secondProcess = ctx->gpr[1];
-
-      currentPipeID++;
-
-      pipes[currentPipeID].process1 = firstProcess;
-      pipes[currentPipeID].process2 = secondProcess;
-
-      pipes[currentPipeID].data[0] = -42;
-      pipes[currentPipeID].data[1] = -42 ;
+      // ctx->gpr[0] = -1;
+      int *filedes = ctx->gpr[0];
+      filedes[0] = -1;
+      filedes[1] = -1;
+      int doneFirst = 0;
+      for(int i = 0; i < 64; i++){
+        if(pipes[i].isFree){
+          if(!doneFirst){
+            filedes[0] = i;
+            pipes[i].isFree = 0;
+            doneFirst = 1;
+          }
+          else{
+            filedes[1] = i;
+            pipes[i].isFree = 0;
+            break;
+          }
+        }
+      }
 
       break;
     }
 
     case 0x11: { //0x11 => readPipe()
-      int pipeId  = ctx->gpr[0];
-      int channel = ctx->gpr[1];
+      int fd = ctx->gpr[0];
+      int erase = ctx->gpr[1];
+        if((!pipes[fd].isClosed) && pipes[fd].isWritten == 1){
+            ctx->gpr[0] = pipes[fd].message;
+            if(erase == 1) pipes[fd].isWritten = 0;
 
-      if(pipeId <= currentPipeID)
-        ctx->gpr[0] = pipes[pipeId].data[channel];
-      else ctx->gpr[0] = -42;
+        }
+        else ctx->gpr[0] = UNWRITTEN;
 
       break;
     }
 
     case 0x12: { //0x12 => writePipe()
       // int pipeId = ctx->gpr[0];
-      int pipeId    = ctx->gpr[0];
-      int direction = ctx->gpr[1];
-      int data      = ctx->gpr[2];
-
-      if(pipeId <= currentPipeID){
-        pipes[pipeId].data[direction] = data;
-      }
+      int fd = ctx->gpr[0];
+      // printNumber(555555);
+      if(!pipes[fd].isClosed && !pipes[fd].isWritten){
+          pipes[fd].message = ctx->gpr[1];
+          if(pipes[fd].message == UNWRITTEN) pipes[fd].isWritten = 0;
+          else pipes[fd].isWritten = 1;
+        }
 
       break;
     }

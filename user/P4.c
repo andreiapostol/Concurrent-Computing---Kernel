@@ -20,7 +20,6 @@ uint32_t gcd( uint32_t x, uint32_t y ) {
 }
 
 void main_P4() {
-  properPipeWrite(0, 0, 17);
   while( 1 ) {
     // write( STDOUT_FILENO, "P4", 2 );
 

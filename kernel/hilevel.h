@@ -24,6 +24,7 @@
 #include "lolevel.h"
 #include "int.h"
 #include "scheduling.h"
+#include "defines.h"
 
 typedef int pid_t;
 
@@ -49,9 +50,17 @@ typedef struct pcb_t {
 } pcb_t;
 
 typedef struct pipe_t{
-  pid_t process1, process2;
-  int data[2];
+  /*pid_t process1, process2;
+  int data[2];*/
+  int message;
+  int isWritten;
+  int isClosed;
+  int isFree;
 } pipe_t;
+
+typedef struct fildes_t{
+  int address;
+} fildes_t;
 
 
 #endif

@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "defines.h"
 
 // Define a type that that captures a Process IDentifier (PID).
 
@@ -84,11 +85,11 @@ extern int  kill( pid_t pid, int x );
 // for process identified by pid, set  priority to x
 extern void nice( pid_t pid, int x );
 
-extern void pipe     ( int p1, int p2 );
-extern int  readPipe ( int pipeId, int channel);
-extern void writePipe( int pipeId, int direction, int data);
+extern int  pipe     ( int filedes[2] );
+extern int  readPipe ( int fd , int erase);
+extern void writePipe( int fd , int data);
 
-int properPipeRead(int pipeId, int channel);
-void properPipeWrite(int pipeId, int destination, int data);
+int  properReadPipe  ( int fd );
+void properWritePipe ( int fd, int data );
 
 #endif

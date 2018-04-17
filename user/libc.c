@@ -51,23 +51,6 @@ void printString(char *s, int length){
   write(STDOUT_FILENO, s, length);
 }
 
-int properPipeRead(int pipeId, int channel){
-  int readValue = readPipe(pipeId, channel);
-  while(readValue == -42){
-    readValue = readPipe(pipeId, channel);
-  }
-  writePipe(pipeId, channel, -42);
-  return readValue;
-}
-
-void properPipeWrite(int pipeId, int destination, int data){
-  int readValue = readPipe(pipeId, destination);
-  while(readValue != -42){
-    readValue = readPipe(pipeId, destination);
-  }
-  // printNumber(data);
-  writePipe(pipeId, destination, data);
-}
 
 int  atoi( char* x        ) {
   char* p = x; bool s = false; int r = 0;
@@ -114,6 +97,29 @@ void itoa( char* r, int x ) {
   return;
 }
 
+int properReadPipe ( int fd ){
+  int i = 0;
+  int readValue = readPipe( fd , 1 );
+  while (readValue == UNWRITTEN) {
+    readValue = readPipe( fd, 1 );
+    // printNumber(readValue);
+    // printString(" ", 1);
+    // printNumber(fd);
+    // printString(" ", 1);
+    i++;
+  }
+  writePipe(fd, UNWRITTEN);
+  return readValue;
+}
+
+void properWritePipe( int fd, int data ){
+  int readValue = readPipe( fd, 0 );
+  while (readValue != UNWRITTEN) {
+    readValue = readPipe( fd, 0 );
+    writePipe(fd, readValue);
+  }
+  writePipe(fd, data);
+}
 void yield() {
   asm volatile( "svc %0     \n" // make system call SYS_YIELD
               :
@@ -211,58 +217,40 @@ void nice( int pid, int x ) {
   return;
 }
 
-
-
-void pipe(int p1, int p2){
-
-  asm volatile(   "mov r0, %1 \n"
-                  "mov r1, %2 \n"
-                  "svc %0     \n" // make system call SYS_PIPE
-                :
-                : "I" (SYS_PIPE), "r" (p1), "r" (p2)
-                : "r0", "r1" );
+int pipe( int filedes[2] ){
+  int r;
+  asm volatile( "mov r0, %2 \n"
+                "svc %1     \n" // make system call SYS_PIPE
+                "mov %0, r0 \n"
+              : "=r" (r)
+              : "I" (SYS_PIPE), "r" (filedes)
+              : "r0");
+  return r;
 }
 
-int readPipe(int pipeId, int channel){
+int readPipe(int fd, int erase){
   int r;
   asm volatile(   "mov r0, %2 \n"
                   "mov r1, %3 \n"
                   "svc %1     \n" // make system call SYS_PIPE
                   "mov %0, r0 \n"
                 : "=r" (r)
-                : "I" (SYS_READPIPE), "r" (pipeId), "r" (channel)
+                : "I" (SYS_READPIPE), "r" (fd), "r" (erase)
                 : "r0", "r1" );
 
   return r;
+
 }
 
-void writePipe(int pipeId, int direction, int data){
+void writePipe(int fd, int data){
   asm volatile(   "mov r0, %1 \n"
                   "mov r1, %2 \n"
-                  "mov r2, %3 \n"
                   "svc %0     \n" // make system call SYS_PIPE
                 :
-                : "I" (SYS_WRITEPIPE), "r" (pipeId), "r" (direction), "r" (data)
-                : "r0", "r1", "r3" );
+                : "I" (SYS_WRITEPIPE), "r" (fd), "r" (data)
+                : "r0", "r1" );
+
 }
-
-
-
-
-
-// int pipe( int filedes[2] ){
-//   int r;
-//   asm volatile( "mov r0, %2 \n"
-//                 "svc %1     \n" // make system call SYS_PIPE
-//                 "mov %0, r0 \n"
-//               : "=r" (r)
-//               : "I" (SYS_PIPE), "r" (filedes)
-//               : "r0");
-//   return r;
-// }
-
-
-
 
 
 
