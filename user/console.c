@@ -117,8 +117,6 @@ void main_console() {
       // for(int i = 0; i < 10; i++){
       //   if(i == pid) PL011_putc( UART0, '0'+i, true );
       // }
-      char *test;
-      itoa(test, pid);
     }
     else if( 0 == strcmp( p, "terminate" ) ) {
       pid_t pid = atoi( strtok( NULL, " " ) );

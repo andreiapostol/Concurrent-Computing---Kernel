@@ -18,13 +18,6 @@ uint32_t weight( uint32_t x ) {
 }
 
 void main_P3() {
-  // printNumber(10);
-  int filedes[2];
-  filedes[0] = 15;
-  filedes[1] = 30;
-  pipe(filedes);
-  printNumber(filedes[0]);
-  printNumber(filedes[1]);
   while( 1 ) {
     write( STDOUT_FILENO, "P3", 2 );
 

@@ -14,6 +14,14 @@ int currentPipeID = -1;
 int currentPID = 0;
 int offset = 0x00001000;
 
+unsigned short lfsr = 0xACE1u;
+unsigned bit;
+
+unsigned random(){
+  bit  = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5) ) & 1;
+  return lfsr =  (lfsr >> 1) | (bit << 15);
+}
+
 void customWrite(char *str, int length){
   for(int i = 0; i < length; i++){
     PL011_putc(UART0, str[i], true);
@@ -50,6 +58,7 @@ void renderScreen(){
         break;
     }
 
+
     printNumber(pcb[i].currentPriority);
     if(pcb[i].currentPriority < 10) customWrite("      ┃", 10);
     else if(pcb[i].currentPriority < 100)  customWrite("     ┃", 9);
@@ -59,6 +68,26 @@ void renderScreen(){
   }
     customWrite("┗━━━━┻━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━┛",120);
     customWrite("\n", 1);
+
+    printString("    ⬤       ⬤       ⬤       ⬤  \n", 44);
+    printString("  ╔══════════════════════════════╗  \n", 101);
+    printString("  ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║  \n", 103);
+    printString("  ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║  \n", 101);
+    printString("⬤ ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║⬤  \n", 106);
+    printString("  ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║  \n", 101);
+    printString("  ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║  \n", 101);
+    printString("⬤ ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║⬤  \n", 106);
+    printString("  ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║  \n", 101);
+    printString("  ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║  \n", 101);
+    printString("⬤ ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║⬤  \n", 106);
+    printString("  ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║  \n", 101);
+    printString("  ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║  \n", 101);
+    printString("⬤ ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║⬤  \n", 106);
+    printString("  ║░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒║  \n", 101);
+    printString("  ║▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░▒░║  \n", 101);
+    printString("  ╚══════════════════════════════╝  \n", 101);
+    printString("    ⬤       ⬤       ⬤       ⬤  \n", 44);
+
 }
 
 void clearScreen(){
@@ -80,7 +109,35 @@ void clearScreen(){
  *   can be created, and neither is able to terminate.
  */
 
-// enum PipeStatus {UNITIALIZED};
+ void resetAllPriorities(){
+   for(int i = 0; i < numberOfProcesses; i++)
+    pcb[i].currentPriority /= 2;
+ }
+ int getMaximumPriorityIndex(){
+   int maxIndex = 0;
+   for (int i = 1; i < numberOfProcesses; i++){
+      if(pcb[i].currentPriority > pcb[maxIndex].currentPriority
+        && pcb[i].status != STATUS_TERMINATED)
+        maxIndex = i;
+   }
+  //  printNumber(maxIndex);
+   return maxIndex;
+ }
+
+ void prioritize(){
+   if(numberOfProcesses == 1) return;
+   int maxIndex = getMaximumPriorityIndex();
+   if(pcb[maxIndex].currentPriority > 250) resetAllPriorities();
+   for (int i = 0; i < numberOfProcesses; i++){
+     if(i != maxIndex){
+       pcb[i].currentPriority += (pcb[i].basePriority / 10) + 10;
+       if(pcb[i].currentPriority >= pcb[maxIndex].currentPriority)
+         pcb[maxIndex].currentPriority = 0;
+     }
+   }
+ }
+
+int consoleTime = 0;
 
 void scheduler( ctx_t* ctx ) {
   // PL011_putc( UART0, '`', true );
@@ -92,26 +149,28 @@ void scheduler( ctx_t* ctx ) {
     //   PL011_putc( UART0, '0' + (pcb[i].status == STATUS_TERMINATED ? 1 : 0), true );
     // PL011_putc( UART0, ']', true );
     // PL011_putc( UART0, ' ', true );
-    if(numberOfProcesses != 1){
-      int exExecuting = executing;
-      do{
-        nextProcess = (++exExecuting) % numberOfProcesses;
-      }
-      while(pcb[ nextProcess ].status == STATUS_TERMINATED);
+    // if(numberOfProcesses != 1){
+    //   int exExecuting = executing;
+    //   do{
+    //     nextProcess = (++exExecuting) % numberOfProcesses;
+    //   }
+    //   while(pcb[ nextProcess ].status == STATUS_TERMINATED);
+    // }
+    // else{
+    //   nextProcess = executing;
+    // }
+
+    consoleTime = (consoleTime + 1) % 2;
+    if(!consoleTime){
+      prioritize(numberOfProcesses);
+      nextProcess = getMaximumPriorityIndex(numberOfProcesses);
     }
-    else{
-      nextProcess = executing;
-    }
-
-  // prioritize(pcb, numberOfProcesses);
-  // int a  = getMaximumPriorityIndex(pcb, numberOfProcesses);
-  // nextProcess = getMaximumPriorityIndex(pcb, numberOfProcesses);
-  // if(numberOfProcesses == 2) nextProcess = 1;
+    else nextProcess = 0;
 
 
 
 
-  if(nextProcess != executing){
+  // if(nextProcess != executing){
     memcpy( &pcb[ executing ].ctx, ctx, sizeof( ctx_t ) );        // preserve P_1
 
     if(pcb[ executing ].status != STATUS_TERMINATED)
@@ -120,7 +179,7 @@ void scheduler( ctx_t* ctx ) {
     memcpy( ctx, &pcb[ nextProcess ].ctx, sizeof( ctx_t ) );      // restore  P_2
     pcb[ nextProcess ].status = STATUS_EXECUTING;                 // update   P_2 status
     executing = nextProcess;                                      // update   index => P_2
-  }
+  // }
   // PL011_putc( UART0, 'E', true );
   // PL011_putc( UART0, '0'+executing, true );
   // PL011_putc( UART0, ':', true );
@@ -155,8 +214,8 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
     pcb[ 0 ].ctx.sp   = ( uint32_t )( &(tos_general)  );
     pcb[ 0 ].tos   = ( uint32_t )( &(tos_general)  );
-    pcb[ 0 ].basePriority = 100;
-    pcb[ 0 ].currentPriority = 0;
+    pcb[ 0 ].basePriority = 0;
+    pcb[ 0 ].currentPriority = 50;
 
     for(int i = 0; i < 10; i++){
       pcb[i].status = STATUS_TERMINATED;
@@ -172,7 +231,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     executing = 0;
 
     // TIMER0->Timer1Load  = 0x00011010; // select period = 2^20 ticks ~= 1 sec
-    TIMER0->Timer1Load  = 0x00010000; // select period = 2^20 ticks ~= 1 sec
+    TIMER0->Timer1Load  = 0x00020000; // select period = 2^20 ticks ~= 1 sec
     TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
     TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
     TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
@@ -215,30 +274,6 @@ void hilevel_handler_irq(ctx_t* ctx) {
   GICC0->EOIR = id;
   customWrite("\e[1;1H\e[2J", 12);
   renderScreen();
-
-  // printString("\\   ●  |  ●  |  ●  |  ●    /",28);
-  // printString("\n",1);
-  // printString("● ╔=======================╗ ●",29);
-  // printString("\n",1);
-  // printString("| ║                       ║ |",29);
-  // printString("\n",1);
-  // printString("  ╚=======================╝ ",29);
-  // printString("\n",1);
-  // printString("\\   ●  |  ●  |  ●  |  ●    /",30);
-
-  // printString("\\  o   |  x  |  o  |   o   /\n", 29);
-  // printString("o                           o\n", 30);
-  // printString("|                           |\n", 30);
-  // printString("o                           o\n", 30);
-  // printString("|                           |\n", 30);
-  // printString("o                           o\n", 30);
-  // printString("|                           |\n", 30);
-  // printString("o                           o\n", 30);
-  // printString("/  o   |  o  |  o  |   o   \\\n", 29);
-  // for(int i = 0; i < 8; i++){
-  //   printNumber(pipes[i].message);
-  //   printString(" ", 1);
-  // }
 
   return;
 }
@@ -333,7 +368,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
         pcb[ executing ].status = STATUS_EXECUTING;
         ctx->pc = (uint32_t) ctx->gpr[0];
         pcb[ executing ].basePriority = ctx->gpr[1];
-        pcb[ executing ].currentPriority = 0;
+        pcb[ executing ].currentPriority = 100;
       }
 
       // TODO de dat clear la stack
