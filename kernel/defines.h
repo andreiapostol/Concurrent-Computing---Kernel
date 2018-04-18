@@ -1,0 +1,8 @@
+#define UNWRITTEN        1234
+#define REQUESTLEFTFORK  100
+#define REQUESTRIGHTFORK 200
+#define PUTDOWNFORKS     300
+#define HASEATEN         1000
+#define CANPICKUPFORK    500
+
+#define FORKDOWN         9999
