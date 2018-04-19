@@ -20,11 +20,15 @@
 #include "GIC.h"
 #include "PL011.h"
 #include "SP804.h"
+#include "PL050.h"
+#include "PL111.h"
+#include   "SYS.h"
 
 #include "lolevel.h"
 #include "int.h"
 #include "scheduling.h"
 #include "defines.h"
+#include "letters.h"
 
 typedef int pid_t;
 
@@ -47,6 +51,7 @@ typedef struct pcb_t {
      uint32_t tos;
      uint32_t basePriority;
      uint32_t currentPriority;
+     uint32_t currentTime;
 } pcb_t;
 
 typedef struct pipe_t{
@@ -58,9 +63,9 @@ typedef struct pipe_t{
   int isFree;
 } pipe_t;
 
-typedef struct fildes_t{
-  int address;
-} fildes_t;
-
+typedef struct drawingPosition{
+  int x;
+  int y;
+} drawingPosition;
 
 #endif
