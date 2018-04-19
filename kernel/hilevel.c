@@ -525,8 +525,8 @@ void hilevel_handler_irq(ctx_t* ctx) {
 
       case 0x1C: {
         if(currentButtonSelection == 0){
-          fork();
-          exec(load("P3"), 100);
+          // fork();
+          // exec(load("P3"), 100);
         }
         break;
       }
